@@ -22,10 +22,9 @@ def clean(df: pd.DataFrame, daily_ref: pd.DataFrame | None = None) -> pd.DataFra
     d["weight"] = d["weight"].fillna(31_000)
 
     d["hav"] = haversine(d.pickup_lat, d.pickup_lon, d.delivery_lat, d.delivery_lon)
-    ratio = d["distance"] / d["hav"].clip(lower=1)
-    # road distance is ~1.18x great-circle; flag impossible values and rebuild them
-    d["distance_bad"] = ((ratio > 1.6) | (ratio < 1.0)).astype(int)
-    d["distance_fixed"] = np.where(d["distance_bad"] == 1, d["hav"] * 1.182, d["distance"])
+    # NOTE: the `distance` column is clean. Within a lane it varies by only ~2%, and short lanes have a
+    # 70-mile minimum, so ratios to great-circle distance look odd (coordinates are rough, e.g. Allentown
+    # sits ~1 mile from New York). Rebuilding "odd" distances was tested and made short-lane errors worse.
 
     d["market_missing"] = d["market_index"].isna().astype(int)
     ref = d.groupby("date")["market_index"].median() if daily_ref is None else daily_ref["market_index"]
@@ -42,8 +41,8 @@ def daily_reference(frames) -> pd.DataFrame:
 
 def build_features(d: pd.DataFrame, daily_ref: pd.DataFrame) -> pd.DataFrame:
     X = pd.DataFrame(index=d.index)
-    X["log_dist"] = np.log(d["distance_fixed"])
-    X["distance"] = d["distance_fixed"]
+    X["log_dist"] = np.log(d["distance"])
+    X["distance"] = d["distance"]
     X["hav"] = d["hav"]
     X["equip"] = d["equipment"].map(EQUIP)
     X["weight"] = d["weight"]

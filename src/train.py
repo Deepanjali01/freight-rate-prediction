@@ -37,7 +37,7 @@ def main():
     ref = daily_reference([t, v])
     T, V = clean(t, ref), clean(v, ref)
     XT, XV = build_features(T, ref), build_features(V, ref)
-    y, dT = T["posted_rate"].values, T["distance_fixed"].values
+    y, dT = T["posted_rate"].values, T["distance"].values
 
     # ---- time-based validation: train Jan-Aug, test Sep-Oct (mimics forecasting Nov-Dec)
     tr = (T.date < "2025-09-01").values
@@ -52,7 +52,7 @@ def main():
 
     # ---- final model on all labeled data
     models = fit(XT, y, dT)
-    pred = predict(models, XV, V["distance_fixed"].values)
+    pred = predict(models, XV, V["distance"].values)
     out = pd.DataFrame({"load_id": v["load_id"], "predicted_rate": np.round(pred, 2)})
     tmpl = pd.read_csv("data/validation_predictions_template.csv")
     assert list(tmpl.load_id) == list(out.load_id), "ID order mismatch with template"
@@ -66,9 +66,9 @@ def main():
     for side in ["pickup", "delivery"]:
         D[f"{side}_lat"] = D[side].map(coords["lat"]); D[f"{side}_lon"] = D[side].map(coords["lon"])
     D["market_index"] = D["date"].map(ref["market_index"]); D["quote_signal"] = D["date"].map(ref["quote_signal"])
-    D = clean(D, ref); D["distance_fixed"] = D["distance"]    # 360 mi is given
+    D = clean(D, ref)
     XD = build_features(D, ref)
-    dec["predicted_rate"] = np.round(predict(models, XD, D["distance_fixed"].values), 2)
+    dec["predicted_rate"] = np.round(predict(models, XD, D["distance"].values), 2)
     dec.to_csv("data/december_chart_inputs.csv", index=False, date_format="%Y-%m-%d")
     Path("scorer_results").mkdir(exist_ok=True)
     Path("scorer_results/validation_metrics.json").write_text(json.dumps(report, indent=2))
